@@ -1,0 +1,41 @@
+name: Commit Stage ddl
+on: push
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Change wrapper permissions
+        run: chmod +x ./gradlew
+      - name: Build with Gradle (Build, unit tests and integration tests)
+        run: ./gradlew build
+      - name: Document environment
+        run:  echo ${{ github.workspace }}
+          ls -la ${{ github.workspace }}
+      - name: Code vulnerability scanning
+        uses: anchore/scan-action@v3
+        id: scan
+        with:
+          path: "${{ github.workspace }}"
+          fail-build: false
+          severity-cutoff: high
+      - name: Examine grype report
+        run: cat "./results.sarif"
+      - name: Upload vulnerability report
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
